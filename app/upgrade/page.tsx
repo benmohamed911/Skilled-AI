@@ -1,16 +1,12 @@
 "use client";
-import { useState } from "react";
 import AppShell, { useSession } from "@/components/AppShell";
 import { Check } from "@/components/ui";
 import { FREE_TESTS_PER_MONTH, PRO_PRICE } from "@/lib/exam";
-import { setPlan } from "@/lib/store";
 
 export default function Upgrade() {
   const session = useSession();
-  const [, refresh] = useState(0);
   if (!session) return null;
   const pro = session.plan === "pro";
-  const change = (p: "free" | "pro") => { setPlan(p); session.plan = p; refresh((n) => n + 1); };
 
   return (
     <AppShell session={session}>
@@ -29,12 +25,12 @@ export default function Upgrade() {
           <ul className="checks" style={{ margin: "0 0 20px" }}>
             {["Unlimited practice tests", "Full-length timed simulations", "Full skill gap analysis", "Personalized AI study plan", "Readiness history"].map((t) => <li key={t}><Check />{t}</li>)}
           </ul>
-          <p className="notice" style={{ flex: "none", color: "var(--ink)" }}>
-            <b>Preview mode:</b> card payments are not connected yet, so nobody can be charged. Use the button below to see the app as a Pro user would.
-          </p>
-          {pro
-            ? <button className="btn btn-ghost" onClick={() => change("free")}>Switch back to Free (preview)</button>
-            : <button className="btn btn-orange" onClick={() => change("pro")}>Preview Pro features</button>}
+          {!pro && (
+            <>
+              <p className="notice" style={{ flex: "none", color: "var(--ink)" }}>Card payments are not open yet. Pro will be available to buy here soon.</p>
+              <button className="btn btn-orange" disabled>Go Pro — coming soon</button>
+            </>
+          )}
         </div>
       </div>
     </AppShell>

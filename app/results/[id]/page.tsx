@@ -13,12 +13,12 @@ export default function ResultPage() {
   const { id } = useParams<{ id: string }>();
   const [a, setA] = useState<Attempt | null | undefined>(undefined);
   const [onlyWrong, setOnlyWrong] = useState(true);
-  useEffect(() => { setA(getAttempt(id)); }, [id]);
+  useEffect(() => { getAttempt(id).then(setA, () => setA(null)); }, [id]);
   if (!session || a === undefined) return null;
   if (!a) {
     return (
       <AppShell session={session}>
-        <div className="card empty"><h2>Result not found</h2><p>This result is not saved in this browser.</p><Link href="/dashboard" className="btn btn-navy">Back to dashboard</Link></div>
+        <div className="card empty"><h2>Result not found</h2><p>We could not find this result in your account.</p><Link href="/dashboard" className="btn btn-navy">Back to dashboard</Link></div>
       </AppShell>
     );
   }

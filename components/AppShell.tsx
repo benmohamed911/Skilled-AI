@@ -3,21 +3,24 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Logo } from "./ui";
-import { freeTestsLeft, getAttempts, getPlan, getUser, signOut } from "@/lib/store";
+import { freeTestsLeft, loadSession, supabase, type Session } from "@/lib/store";
 import { FREE_TESTS_PER_MONTH } from "@/lib/exam";
-import type { Attempt, Plan, User } from "@/lib/types";
 
-export interface Session { user: User; plan: Plan; attempts: Attempt[] }
+export type { Session };
 
 /** Loads the signed-in user's data. Sends visitors who are not signed in to the login page. */
 export function useSession(): Session | null {
   const router = useRouter();
   const [s, setS] = useState<Session | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    const user = getUser();
-    if (!user) return router.replace("/login");
-    setS({ user, plan: getPlan(), attempts: getAttempts() });
+    let live = true;
+    loadSession()
+      .then((x) => { if (!live) return; x ? setS(x) : router.replace("/login"); })
+      .catch(() => live && setFailed(true));
+    return () => { live = false; };
   }, [router]);
+  if (failed) throw new Error("We could not load your data. Check your connection and refresh the page.");
   return s;
 }
 
@@ -42,7 +45,7 @@ export default function AppShell({ session, children }: { session: Session; chil
           {items.map((it) => (
             <Link key={it.href} href={it.href} className={path.startsWith(it.href) ? "on" : ""}><I d={it.d} />{it.label}</Link>
           ))}
-          <button onClick={() => { signOut(); router.push("/"); }}><I d="M10 5H5v14h5M15 8l4 4-4 4M19 12H9" />Sign out</button>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push("/"); }}><I d="M10 5H5v14h5M15 8l4 4-4 4M19 12H9" />Sign out</button>
         </nav>
         <div className="side-plan">
           {session.plan === "pro" ? (

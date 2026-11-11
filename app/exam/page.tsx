@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppShell, { useSession } from "@/components/AppShell";
 import { Bar } from "@/components/ui";
 import { FREE_TESTS_PER_MONTH, MODES, TRACK, domainName, modeTotal } from "@/lib/exam";
-import { freeTestsLeft, saveAttempt } from "@/lib/store";
-import type { Attempt, Mode, PublicQuestion, StudyPlan } from "@/lib/types";
+import { api, freeTestsLeft } from "@/lib/store";
+import type { Mode, PublicQuestion } from "@/lib/types";
 
 interface Running {
   mode: Mode;
@@ -51,30 +51,18 @@ export default function ExamPage() {
     setBusy("Scoring your exam…");
     try {
       const seconds = Math.round((Math.min(Date.now(), run.endsAt) - run.startedAt) / 1000);
-      const res = await fetch("/api/exam/submit", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: run.mode, ids: run.questions.map((q) => q.id), answers: run.answers, seconds }),
+      const { id } = await api<{ id: string }>("/api/exam/submit", {
+        mode: run.mode, ids: run.questions.map((q) => q.id), answers: run.answers, seconds,
       });
-      if (!res.ok) throw new Error();
-      const attempt: Attempt = { ...(await res.json()), id: crypto.randomUUID(), date: new Date().toISOString() };
-      saveAttempt(attempt); // save the score first so it is never lost
-      setBusy("Building your study plan…");
-      try {
-        const p = await fetch("/api/study-plan", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: session?.plan, pct: attempt.pct, domains: attempt.domains, gaps: attempt.gaps }),
-        });
-        if (p.ok) saveAttempt({ ...attempt, plan: (await p.json()) as StudyPlan });
-      } catch { /* the result page still works without a plan */ }
       setRun(null);
       try { sessionStorage.removeItem(KEY); } catch {}
-      router.push(`/results/${attempt.id}`);
-    } catch {
-      setError("We could not submit your exam. Check your connection and try again — your answers are still here.");
+      router.push(`/results/${id}`);
+    } catch (e) {
+      setError(`${(e as Error).message} Your answers are still here.`);
       setBusy("");
       submitting.current = false;
     }
-  }, [run, router, session?.plan]);
+  }, [run, router]);
 
   const left = run ? Math.max(0, Math.ceil((run.endsAt - now) / 1000)) : 0;
   useEffect(() => { if (run && left === 0 && !error) submit(); }, [run, left, submit, error]);
@@ -84,14 +72,12 @@ export default function ExamPage() {
   async function start(mode: Mode) {
     setError(""); setBusy("Preparing your exam…");
     try {
-      const res = await fetch("/api/exam/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
-      if (!res.ok) throw new Error();
-      const data = (await res.json()) as { questions: PublicQuestion[]; minutes: number };
+      const data = await api<{ questions: PublicQuestion[]; minutes: number }>("/api/exam/start", { mode });
       const t = Date.now();
       setNow(t);
       setRun({ mode, questions: data.questions, answers: {}, flags: [], idx: 0, startedAt: t, endsAt: t + data.minutes * 60000 });
-    } catch {
-      setError("We could not start the exam. Please try again.");
+    } catch (e) {
+      setError((e as Error).message);
     }
     setBusy("");
   }
